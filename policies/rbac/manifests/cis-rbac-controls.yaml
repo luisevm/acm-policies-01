@@ -71,7 +71,10 @@ spec:
   severity: high
   object-templates-raw: |
     {{- /* ---- Trusted Roles: add "namespace/rolename" entries to skip ---- */ -}}
-    {{- $allowedRoles := list }}
+    {{- $allowedRoles := list
+          "namespace/rolename"
+          "test-wildcard-role/test-wildcard" 
+    }}
 
     {{- /* Platform namespace prefixes and exact names to exclude from scanning */ -}}
     {{- $exclPrefixes := list "openshift" "kube-" "open-cluster-management-" "multicluster" "cert-" "catalogd-" "costmanagement-" "external-dns-" "node-observability-" "redhat-" "rhdh-" "submariner-" "hive-" }}
