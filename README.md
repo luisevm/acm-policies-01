@@ -2,10 +2,14 @@
 
 ## Introduction
 
-This repository contains an exercise that is using Red Hat ACM policies framework to enforce the state of configuration and inform about the status of a subset of CIS Benchmark controls.
-ArgoCD is loaded with the policy generator plugin that deploys some of the policies using a GitOps aproach.
+This repository demonstrates how ACM can be used to inform on or enforce OpenShift platform configurations, enabling unified, consistent operations, regulatory alignment, and risk reduction at scale.
+
+It includes multiple tests that exemplify the use of native Red Hat ACM Policies (via ConfigurationPolicy) to detect and enforce violations against applied policies.
+
+Policies are deployed using the PolicyGenerator plugin, both standalone and with ArgoCD providing GitOps-driven delivery.
 
 ### GitHub Repository Organization
+
 The Git repository used for this demo has the following structure:
 
 - **argocd:** ArgoCD ApplicationSet definitions.
@@ -14,116 +18,9 @@ The Git repository used for this demo has the following structure:
 - **policies:** One subfolder per audit/compliance policy domain. 
 - **auxiliar:** contains manifests, for example policies, that will be used in the test exercices.
 
----
-
-## Deployment Guide
-
-### Overview
-
-The deployment has three phases:
-
-1. **Hub cluster groups:** Manually apply ACM namespace, RBAC, ManagedClusterSets, and ManagedClusterSetBindings to the hub cluster.
-2. **GitOps operator install in:** Apply an ACM `OperatorPolicy` to the hub. ACM installs the GitOps operator, configures ArgoCD with the PolicyGenerator plugin and ApplicationSet controller, and registers ArgoCD with ACM.
-3. **Policy and operator deployment:** Deploy ACM policies and operator installs to managed clusters via PolicyGenerator and ArgoCD (two ApplicationSets).
-
-### Prerequisites
-
-Before starting, ensure the following:
-
-- **Red Hat ACM** is installed on the hub cluster and the `MultiCluster Engine` is installed and running.
-- **At least one managed (spoke) cluster** with the name `cluster1`. Verify with: `oc get managedclusters`.
-- **oc CLI** is available and authenticated to the hub cluster with `cluster-admin` privileges.
-- **Git repository** is accessible from the hub cluster (the ArgoCD repo-server must be able to clone it).
-
-- Clone the repository
-
-  You should clone the repository for a git account that you own, so that you are allowed to push to the repository changes.
-
-  ```bash
-  git clone https://github.com/luisevm/acm-policies-01.git
-  cd acm-policies-01
-  ```
-
-- Login to the ACM HUB
-
-  ```bash
-  oc login -u admin -p <password>  https://<api>:6443
-  ```
-
-- Apply Hub Cluster Groups
-
-  Apply all cluster group resources to the hub. These create the `acm-policies` namespace, RBAC for the ArgoCD controller, ManagedClusterSets, and ManagedClusterSetBindings. The `acm-policies` namespace must exist before the OperatorPolicy can be applied in the next step.
-
-  ```bash
-  oc apply -f hub/clustergroups/
-  ```
-
-- Install GitOps Operator to the ACM HUB
-
-  Generate and apply the GitOps policy to the hub. ACM will install the OpenShift GitOps operator, and configure the ArgoCD instance with the PolicyGenerator plugin.
-
-  **Note:** You must configure the policy generator plugin in your laptop before running this command.
-
-  ```bash
-  kustomize build hub/gitops --enable-alpha-plugins | oc apply -f -
-  ```
-
-  Monitor the policy compliance:
-
-  ```bash
-  oc get policy gitops-operator -n acm-policies -w
-  ```
-
-  > **Note:** The ConfigurationPolicy for the ArgoCD patch will initially be non-compliant while the operator is installing (the ArgoCD instance does not exist yet). ACM retries automatically — once the operator creates the ArgoCD instance, the patch is applied. This is expected behavior.
-
-- Deploy ACM Policies
-
-  The policies are created using GitOps.
-  Apply both ApplicationSets. Each auto-discovers folders under its respective directory and creates an ArgoCD Application per domain.
-
-  ```bash
-  oc apply -f argocd/operators-appset.yaml
-  oc apply -f argocd/policies-appset.yaml
-  ```
-
-  Verify the generated ApplicationSets and Applications:
-
-  ```bash
-  oc get applicationset.argoproj.io -n openshift-gitops
-  oc get app.argoproj.io -n openshift-gitops
-  ```
-
-- Verify Policies on Managed Clusters
-
-  Check that the policies are distributed and evaluated:
-
-  ```bash
-  # List all policies in the acm-policies namespace
-  oc get policies -n acm-policies
-
-  # Check compliance status
-  oc get policies -n acm-policies -o custom-columns=NAME:.metadata.name,COMPLIANCE:.status.compliant
-  ```
-
----
-
-## Hub Configuration Details
-
-### Grouping Clusters (`hub/clustergroups/`)
-
-After importing managed clusters into ACM, you can assign them to cluster sets by adding labels to the clusters. This enables policy placements to target specific groups of clusters — for example, applying stricter policies to production or different operator configurations to development.
-
-**Command structure:**
-
-```bash
-oc label managedcluster <cluster-name> <label-key>=<label-value> --overwrite
-```
-
----
-
 ## Created Policies
 
-Once tests from a following chapter are worked, the following is the list of  policies created.
+Once the tests from the testing chapter are completed the following are the list of  policies created.
 
 ### Governance Metadata
 
@@ -146,6 +43,90 @@ All policies carry three ACM metadata fields used for filtering and grouping in 
 | Compliance | `compliance-cis-scan`                | enforce     | high     | All OpenShift clusters   | `operators/compliance-operator/` | Deploys CIS ScanSetting + ScanSettingBinding                                                                          |
 | Compliance | `compliance-cis-results`             | inform      | high     | All OpenShift clusters   | `operators/compliance-operator/` | Reports failed CIS ComplianceCheckResults — non-compliant when checks fail                                            |
 
+
+---
+
+## Deployment Guide
+
+### Overview
+
+The deployment has three phases:
+
+1. **Hub cluster groups:** Manually apply ACM namespace, RBAC, ManagedClusterSets, and ManagedClusterSetBindings to the hub cluster.
+2. **GitOps operator install:** Apply an ACM `OperatorPolicy` to the hub. ACM installs the GitOps operator, configures ArgoCD with the PolicyGenerator plugin and ApplicationSet controller, and registers ArgoCD with ACM.
+3. **Policy and operator deployment:** Deploy ACM policies and operator installs to managed clusters via PolicyGenerator and ArgoCD (two ApplicationSets).
+
+### Prerequisites
+
+Before starting, ensure the following:
+
+- **Red Hat ACM** is installed on the hub cluster and the `MultiCluster Engine` is installed and running.
+- **At least one managed (spoke) cluster** with the name `cluster1`. Verify with: `oc get managedclusters`.
+- **oc CLI** is available and authenticated to the hub cluster with `cluster-admin` privileges.
+- **Git repository** is accessible from the hub cluster (the ArgoCD repo-server must be able to clone it).
+
+Do the following configurations:
+
+- Clone the repository
+  You should clone the repository for a git account that you own, so that you are allowed to push to the repository changes.
+  ```bash
+  git clone https://github.com/luisevm/acm-policies-01.git
+  cd acm-policies-01
+  ```
+- Login to the ACM HUB
+  ```bash
+  oc login -u admin -p <password>  https://<api>:6443
+  ```
+- Apply manifests
+  Create the `acm-policies` namespace, RBAC for the ArgoCD controller, ManagedClusterSets, and ManagedClusterSetBindings. The `acm-policies` namespace must exist before the OperatorPolicy can be applied in the next step.
+  ```bash
+  oc apply -f hub/clustergroups/
+  ```
+- Install GitOps Operator to the ACM HUB
+  Apply the GitOps policy to the hub. ACM will install the OpenShift GitOps operator, and configure the ArgoCD instance with the PolicyGenerator plugin.
+  **Note:** You must configure the policy generator plugin in your laptop before running this command.
+  ```bash
+  kustomize build hub/gitops --enable-alpha-plugins | oc apply -f -
+  ```
+  Monitor the policy compliance:
+  ```bash
+  oc get policy gitops-operator -n acm-policies -w
+  ```
+  > **Note:** The ConfigurationPolicy for the ArgoCD patch will initially be non-compliant while the operator is installing (the ArgoCD instance does not exist yet). ACM retries automatically — once the operator creates the ArgoCD instance, the patch is applied. This is expected behavior.
+- Deploy ACM Policies
+  Apply both ApplicationSets. Each auto-discovers folders under its respective directory and creates an ArgoCD Application per domain.
+  ```bash
+  oc apply -f argocd/operators-appset.yaml
+  oc apply -f argocd/policies-appset.yaml
+  ```
+- Verify the generated ApplicationSets and Applications:
+  ```bash
+  oc get applicationset.argoproj.io -n openshift-gitops
+  oc get app.argoproj.io -n openshift-gitops
+  ```
+- Verify Policies on Managed Clusters
+  Check that the policies are distributed and evaluated:
+  ```bash
+  # List all policies in the acm-policies namespace
+  oc get policies -n acm-policies
+
+  # Check compliance status
+  oc get policies -n acm-policies -o custom-columns=NAME:.metadata.name,COMPLIANCE:.status.compliant
+  ```
+
+---
+
+## Hub Configuration Details
+
+### Grouping Clusters (`hub/clustergroups/`)
+
+After importing managed clusters into ACM, you can assign them to cluster sets by adding labels to the clusters. This enables policy placements to target specific groups of clusters — for example, applying stricter policies to production or different operator configurations to development.
+
+**Command structure:**
+
+```bash
+oc label managedcluster <cluster-name> <label-key>=<label-value> --overwrite
+```
 
 ---
 
@@ -177,11 +158,13 @@ data:
 
 Commit and push. ArgoCD syncs the ConfigMap to all clusters and the violation disappears on the next evaluation cycle.
 
-| Method | Policy | File to edit | What to add |
-| --- | --- | --- | --- |
-| Inline `$allowedCRBs` | `rbac-no-unauth-access` | `policies/rbac/manifests/cis-rbac-controls.yaml` | CRB name |
-| Inline `$allowedRoles` | `rbac-no-wildcard-roles` | `policies/rbac/manifests/cis-rbac-controls.yaml` | `namespace/rolename` |
-| ConfigMap key `cis-cluster-admin` | `cis-cluster-admin` | `policies/rbac/manifests/cm-rbac-exceptions.yaml` | CRB name |
+
+| Method                            | Policy                   | File to edit                                      | What to add          |
+| --------------------------------- | ------------------------ | ------------------------------------------------- | -------------------- |
+| Inline `$allowedCRBs`             | `rbac-no-unauth-access`  | `policies/rbac/manifests/cis-rbac-controls.yaml`  | CRB name             |
+| Inline `$allowedRoles`            | `rbac-no-wildcard-roles` | `policies/rbac/manifests/cis-rbac-controls.yaml`  | `namespace/rolename` |
+| ConfigMap key `cis-cluster-admin` | `cis-cluster-admin`      | `policies/rbac/manifests/cm-rbac-exceptions.yaml` | CRB name             |
+
 
 > **Note:** Policy `sa-token-restriction` does not use either mechanism. To exclude namespaces from this policy, add them to `namespaceSelector.exclude` in the policy manifest directly.
 
@@ -207,7 +190,7 @@ Commit and push. ArgoCD syncs the ConfigMap to all clusters and the violation di
   oc extract $SECRET_NAME -n $CLUSTER_NAME --keys=kubeconfig --to=- > /tmp/${CLUSTER_NAME}-kubeconfig
   ```
 - Review the controls results for the Compliance Operator and the controls that must be manually checked.
-  Go to ACM -> Governance, select the `CIS OpenShift Container Platform 4 Benchmark` start and you will find the Policies annotated with this standart.
+Go to ACM -> Governance, select the `CIS OpenShift Container Platform 4 Benchmark` start and you will find the Policies annotated with this standart.
   - Select and explore the policy named `compliance-cis-results`. This policy contains the results of the Compliance Operator scan against the `ocp4-cis`.
   - The rest of the policies are related with manual controls, that the Compliance Operator doenst classify, as these have to be manually checked.
 
@@ -227,25 +210,21 @@ Commit and push. ArgoCD syncs the ConfigMap to all clusters and the violation di
   - on the Cluster, template `cis-results`, press on the `View Details` textfield, this will show the Violations raised by `cis-ocp4`.
   - one of such violations is `ocp4-cis-ocp-allowed-registries`, press on top of this violation and a new window will open with the recommendation to fix it.
   - Lets fix this Violation, by allowing the applicationSet to create the Policy, the Placement is configured with a label of `vendor=OpenShift`, so this configuration is enforced in all the clusters of the fleat, including the hub cluster.
-
 2. Create a new Policy to fix this control. This policy will be applied to all clusters because the placement is selecting the label `vendor: OpenShift`, which is configured in all clusters.
   - Copy the policy to the operators path, this will result that the applicationSet will create the Policy on the Hub
-
     ```bash
     cp -r auxiliar/registries policies/
     ```
-
 3. Push changes to GitHub
-    ```bash
+  ```bash
     git add policies/registries/*
     git commit -m "added allowed registries"
     git push
-    ```
+  ```
 4. A new policy will be added to ACM HUB. This policy will be applied to all clusters.
-
-    ```bash
+  ```bash
     oc -n acm-policies get policy allowed-registries
-    ```
+  ```
 
 **NOTE:** The `ocp4-cis-ocp-allowed-registries` will keep showing a violation until the Openshift compliance scan runs again.
 
@@ -278,14 +257,11 @@ Commit and push. ArgoCD syncs the ConfigMap to all clusters and the violation di
     # 2. Execute your command against the managed cluster
     oc --kubeconfig=/tmp/${CLUSTER_NAME}-kubeconfig get secret kubeadmin -n kube-system
     ```
-
 2. Create a Policy and required files under policies path
-
   - Copy the policy to the operators path, once changes are pushed to Git, this will result that the applicationSet will create the Policy on the Hub
     ```bash
     cp -r auxiliar/kubeadmin policies/
     ```
-
 3. Push changes to GitHub
   ```bash
   git add policies/kubeadmin/*
@@ -293,22 +269,17 @@ Commit and push. ArgoCD syncs the ConfigMap to all clusters and the violation di
   git push
   ```
 4. A new policy will be added to ACM HUB
-
   ```bash
   oc -n acm-policies get policy kubeadmin-remove-enforce
   ```
-
 5. Fix this violation on the selected clusters by labelling the clusters where this policy should be placed.
-
   To decide the clusters where this policy will be placed one must set a label into the clusters where it should be enforced.
-
   - Label a the clusters to enforce the kubeadmin removal:
     ```bash
     oc label managedcluster cluster1 kubeadmin-enforce=true --overwrite
     ```
   - Confirm both policies now show Compliant for that cluster:
-    Wait for ArgoCD to sync and the policy to propagate, then verify the secret was deleted.
-
+  Wait for ArgoCD to sync and the policy to propagate, then verify the secret was deleted.
     ```bash
     oc get policy kubeadmin-remove-enforce -n acm-policies -o jsonpath='{range .status.status[*]}{.clustername}: {.compliant}{"\n"}{end}'
     ```
@@ -320,29 +291,24 @@ Commit and push. ArgoCD syncs the ConfigMap to all clusters and the violation di
 ### Test 3: Run the Compliance Operator OCP CIS Benchmark again and check that the fixed violations are cleared
 
 **Objectives:**
+
 - Run the Compliance operator scan, and verify that the previous checks were fixed. The scan may take several minutes.
 
 1. Scan all clusters
-
   ```bash
   oc annotate compliancescan/ocp4-cis -n openshift-compliance --all compliance.openshift.io/rescan=
 
   oc annotate compliancescans/ocp4-cis compliance.openshift.io/rescan= -n openshift-compliance
   oc --kubeconfig=/tmp/cluster1-kubeconfig annotate compliancescans/ocp4-cis compliance.openshift.io/rescan= -n openshift-compliance
   ```
-
 2. check the state of the new scan
-
   ```bash
   oc get ComplianceSuite -n openshift-compliance
   oc --kubeconfig=/tmp/cluster1-kubeconfig get ComplianceSuite -n openshift-compliance
   ```
-
 3. Once the scan is completed check the state of the controls
-
   - The `cluster1` is not violating the `ocp4-cis-kubeadmin-removed` nor the allowed `ocp4-cis-ocp-allowed-registries`. 
   - And the local-cluster will ot show the `ocp4-cis-ocp-allowed-registries` violation
-
   ```bash
   oc get compliancecheckresult ocp4-cis-ocp-allowed-registries -n openshift-compliance -o jsonpath='{.status}'
 
@@ -396,8 +362,8 @@ Commit and push. ArgoCD syncs the ConfigMap to all clusters and the violation di
 
 **Objectives:**
 
-- test that a ClusterRoleBinding attaching a ServiceAccount to a cluster-admin of ClusterRole, will cause ACM to raise a violation in the Governance tab.  
-- Adding the CRB to the list of trusted CRB will clear the violation.
+- test that a `ClusterRoleBinding` attaching a ServiceAccount to the cluster-admin `ClusterRole`, will cause ACM to raise a violation in the Governance tab.  
+- Adding the CRB to the list of trusted CRB will clear the violation. A `configmap` is used for the list of the whitelisted entities.
 
 **Test Procedure**
 
@@ -407,7 +373,7 @@ Commit and push. ArgoCD syncs the ConfigMap to all clusters and the violation di
   oc create sa test-sa -n test-cis
   oc adm policy add-cluster-role-to-user cluster-admin -z test-sa -n test-cis
   ```
-  The result is that a new ClusterRoleBinding is created (binding the SA to the ClusterRole), referencing `cluster-admin` with a ServiceAccount in a non-platform namespace. Policy `cis-cluster-admin` will flag it as **Non-Compliant**.
+  The result is that a new ClusterRoleBinding is created, binding the SA to the cluster-admin `ClusterRole`. Policy `cis-cluster-admin` will flag it as **Non-Compliant**.
 - Configure the CRB to be trusted, by adding the CRB to the configmap cm-rbac-exceptions.yaml under "cis-cluster-admin: |" 
   ```bash
   vi /mnt/vm/Var/my_git-clone/acm-policies-01/policies/rbac/manifests/cm-rbac-exceptions.yaml
@@ -421,11 +387,6 @@ Commit and push. ArgoCD syncs the ConfigMap to all clusters and the violation di
   git push
   ```
 - Result is the violation is cleared.
-
-
-
-
-
 
 ### Test 6: Trigger `rbac-no-wildcard-roles` — Wildcard Role Detection
 

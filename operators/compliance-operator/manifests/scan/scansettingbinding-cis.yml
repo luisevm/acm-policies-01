@@ -8,6 +8,9 @@ profiles:
   - name: ocp4-cis
     kind: Profile
     apiGroup: compliance.openshift.io/v1alpha1
+  - name: ocp4-cis-node
+    kind: Profile
+    apiGroup: compliance.openshift.io/v1alpha1
 settingsRef:
   name: ocp4-cis
   kind: ScanSetting
