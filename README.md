@@ -68,7 +68,7 @@ Before starting, ensure the following:
 Do the following configurations:
 
 - Clone the repository
-  You should clone the repository for a git account that you own, so that you are allowed to push to the repository changes.
+You should clone the repository for a git account that you own, so that you are allowed to push to the repository changes.
   ```bash
   git clone https://github.com/luisevm/acm-policies-01.git
   cd acm-policies-01
@@ -78,13 +78,13 @@ Do the following configurations:
   oc login -u admin -p <password>  https://<api>:6443
   ```
 - Apply manifests
-  Create the `acm-policies` namespace, RBAC for the ArgoCD controller, ManagedClusterSets, and ManagedClusterSetBindings. The `acm-policies` namespace must exist before the OperatorPolicy can be applied in the next step.
+Create the `acm-policies` namespace, RBAC for the ArgoCD controller, ManagedClusterSets, and ManagedClusterSetBindings. The `acm-policies` namespace must exist before the OperatorPolicy can be applied in the next step.
   ```bash
   oc apply -f hub/clustergroups/
   ```
 - Install GitOps Operator to the ACM HUB
-  Apply the GitOps policy to the hub. ACM will install the OpenShift GitOps operator, and configure the ArgoCD instance with the PolicyGenerator plugin.
-  **Note:** You must configure the policy generator plugin in your laptop before running this command.
+Apply the GitOps policy to the hub. ACM will install the OpenShift GitOps operator, and configure the ArgoCD instance with the PolicyGenerator plugin.
+**Note:** You must configure the policy generator plugin in your laptop before running this command.
   ```bash
   kustomize build hub/gitops --enable-alpha-plugins | oc apply -f -
   ```
@@ -94,7 +94,7 @@ Do the following configurations:
   ```
   > **Note:** The ConfigurationPolicy for the ArgoCD patch will initially be non-compliant while the operator is installing (the ArgoCD instance does not exist yet). ACM retries automatically — once the operator creates the ArgoCD instance, the patch is applied. This is expected behavior.
 - Deploy ACM Policies
-  Apply both ApplicationSets. Each auto-discovers folders under its respective directory and creates an ArgoCD Application per domain.
+Apply both ApplicationSets. Each auto-discovers folders under its respective directory and creates an ArgoCD Application per domain.
   ```bash
   oc apply -f argocd/operators-appset.yaml
   oc apply -f argocd/policies-appset.yaml
@@ -105,7 +105,7 @@ Do the following configurations:
   oc get app.argoproj.io -n openshift-gitops
   ```
 - Verify Policies on Managed Clusters
-  Check that the policies are distributed and evaluated:
+Check that the policies are distributed and evaluated:
   ```bash
   # List all policies in the acm-policies namespace
   oc get policies -n acm-policies
@@ -363,7 +363,7 @@ Go to ACM -> Governance, select the `CIS OpenShift Container Platform 4 Benchmar
 **Objectives:**
 
 - test that a `ClusterRoleBinding` attaching a ServiceAccount to the cluster-admin `ClusterRole`, will cause ACM to raise a violation in the Governance tab.  
-- Adding the CRB to the list of trusted CRB will clear the violation. A `configmap` is used for the list of the whitelisted entities.
+- Adding the CRB to the list of trusted CRB will clear the violation. A `configmap` contains the list of the whitelisted entities.
 
 **Test Procedure**
 
