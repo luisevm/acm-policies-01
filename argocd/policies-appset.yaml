@@ -6,7 +6,7 @@ metadata:
 spec:
   generators:
     - git:
-        repoURL: https://github.com/CSA-RH/acm-policies-01.git
+        repoURL: https://github.com/luisevm/acm-policies-01.git
         revision: main
         directories:
           - path: policies/*
@@ -16,7 +16,7 @@ spec:
     spec:
       project: default
       source:
-        repoURL: https://github.com/CSA-RH/acm-policies-01.git
+        repoURL: https://github.com/luisevm/acm-policies-01.git
         targetRevision: main
         path: '{{path}}'
       destination:

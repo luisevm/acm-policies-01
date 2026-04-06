@@ -40,7 +40,7 @@ Before starting, ensure the following:
   You should clone the repository for a git account that you own, so that you are allowed to push to the repository changes.
 
   ```bash
-  git clone https://github.com/CSA-RH/acm-policies-01.git
+  git clone https://github.com/luisevm/acm-policies-01.git
   cd acm-policies-01
   ```
 
@@ -197,7 +197,7 @@ Commit and push. ArgoCD syncs the ConfigMap to all clusters and the violation di
 
 - Clone the repository
   ```bash
-  git clone https://github.com/CSA-RH/acm-policies-01.git
+  git clone https://github.com/luisevm/acm-policies-01.git
   cd acm-policies-01
   ```
 - Login to the ACM HUB
