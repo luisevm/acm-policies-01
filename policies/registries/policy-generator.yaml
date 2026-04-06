@@ -1,0 +1,26 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: PolicyGenerator
+metadata:
+  name: registries-policies
+policyDefaults:
+  namespace: acm-policies
+  severity: high
+  consolidateManifests: false
+  standards:
+    - CIS OpenShift Container Platform 4 Benchmark
+    - PCI DSS
+  categories:
+    - CM Configuration Management
+  controls:
+    - CM-2 Baseline Configuration
+
+policies:
+  - name: allowed-registries
+    manifests:
+      - path: manifests/allowed-registries-names.yaml
+    remediationAction: enforce
+    severity: high
+    placement:
+      labelSelector:
+        matchLabels:
+          vendor: OpenShift
