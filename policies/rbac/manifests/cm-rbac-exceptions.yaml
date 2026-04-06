@@ -35,4 +35,4 @@ spec:
         data:
           # CRB names to skip in cis-cluster-admin
           cis-cluster-admin: |
-            cluster-admin-0
+            cluster-admin-20
