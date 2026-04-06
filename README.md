@@ -109,13 +109,9 @@ Before starting, ensure the following:
 
 ## Hub Configuration Details
 
-### Cluster Groups (`hub/clustergroups/`)
+### Grouping Clusters (`hub/clustergroups/`)
 
-These resources are applied manually with `oc apply -f hub/clustergroups/` and establish the foundational ACM configuration on the hub cluster. Files are prefixed with numbers to indicate logical ordering (namespace first, then RBAC, then cluster sets, then bindings), though `oc apply` processes them declaratively.
-
-#### Labelling Managed Clusters
-
-After importing managed clusters into ACM, you can assign them to cluster sets and add environment labels. This enables policy placements to target specific groups of clusters — for example, applying stricter policies to production or different operator configurations to development.
+After importing managed clusters into ACM, you can assign them to cluster sets by adding labels to the clusters. This enables policy placements to target specific groups of clusters — for example, applying stricter policies to production or different operator configurations to development.
 
 **Command structure:**
 
@@ -157,7 +153,7 @@ All policies carry three ACM metadata fields used for filtering and grouping in 
 
 When a policy flags a resource that is intentionally configured (e.g., a trusted user who should have `cluster-admin`), you can suppress the violation. RBAC policies use two different exception mechanisms depending on the policy:
 
-**Method 1 — Inline trusted list** (used by `detect-anonymous-and-wildcard-rbac`)
+**Example 1 — Inline trusted list** (used by `detect-anonymous-and-wildcard-rbac`)
 
 The `rbac-no-unauth-access` and `rbac-no-wildcard-roles` ConfigurationPolicies each contain an inline trusted-entity list directly in `policies/rbac/manifests/cis-rbac-controls.yaml`. Add entries to suppress false positives:
 
@@ -166,7 +162,7 @@ The `rbac-no-unauth-access` and `rbac-no-wildcard-roles` ConfigurationPolicies e
 
 Edit the file, commit and push. ArgoCD syncs the change and the violation clears on the next evaluation cycle.
 
-**Method 2 — Exceptions ConfigMap** (used by `cis-cluster-admin`)
+**Example 2 — Exceptions ConfigMap** (used by `cis-cluster-admin`)
 
 The `cis-cluster-admin` policy reads exceptions from a ConfigMap (`rbac-policy-exceptions` in `acm-policies` namespace) deployed to all managed clusters by the `cm-rbac-exceptions-exists` enforce policy. Each key holds a newline-separated list of resource names to skip.
 
@@ -193,7 +189,7 @@ Commit and push. ArgoCD syncs the ConfigMap to all clusters and the violation di
 
 ## Testing
 
-### PrePreparation
+### Pre-Preparation
 
 - Clone the repository
   ```bash
@@ -211,8 +207,8 @@ Commit and push. ArgoCD syncs the ConfigMap to all clusters and the violation di
   oc extract $SECRET_NAME -n $CLUSTER_NAME --keys=kubeconfig --to=- > /tmp/${CLUSTER_NAME}-kubeconfig
   ```
 - Review the controls results for the Compliance Operator and the controls that must be manually checked.
-  Go to ACM -> Governance, select the `CIS OpenShift Container Platform 4 Benchmark` start and you will find the Policies related with this standart.
-  - The policy `compliance-cis-results` contains the results of the Compliance Operator scan against the `ocp4-cis`.
+  Go to ACM -> Governance, select the `CIS OpenShift Container Platform 4 Benchmark` start and you will find the Policies annotated with this standart.
+  - Select and explore the policy named `compliance-cis-results`. This policy contains the results of the Compliance Operator scan against the `ocp4-cis`.
   - The rest of the policies are related with manual controls, that the Compliance Operator doenst classify, as these have to be manually checked.
 
 ---
@@ -232,7 +228,7 @@ Commit and push. ArgoCD syncs the ConfigMap to all clusters and the violation di
   - one of such violations is `ocp4-cis-ocp-allowed-registries`, press on top of this violation and a new window will open with the recommendation to fix it.
   - Lets fix this Violation, by allowing the applicationSet to create the Policy, the Placement is configured with a label of `vendor=OpenShift`, so this configuration is enforced in all the clusters of the fleat, including the hub cluster.
 
-2. Create a Policy and reThis policy will be applied to all clusters.quired files under policies path
+2. Create a new Policy to fix this control. This policy will be applied to all clusters because the placement is selecting the label `vendor: OpenShift`, which is configured in all clusters.
   - Copy the policy to the operators path, this will result that the applicationSet will create the Policy on the Hub
 
     ```bash
@@ -251,6 +247,8 @@ Commit and push. ArgoCD syncs the ConfigMap to all clusters and the violation di
     oc -n acm-policies get policy allowed-registries
     ```
 
+**NOTE:** The `ocp4-cis-ocp-allowed-registries` will keep showing a violation until the Openshift compliance scan runs again.
+
 ---
 
 ### Test 2: Fix Kubeadmin
@@ -259,14 +257,14 @@ Commit and push. ArgoCD syncs the ConfigMap to all clusters and the violation di
 
 **Objectives:**
 
-- Use the ACM configuration manager policy to fix the violation raised by the Compliance operator about the presence of a kubeadmin secret. 
+- Use the ACM configuration manager policy to fix the violation raised by the Compliance operator about the presence of a kubeadmin secret.
 - This policy will aloso demonstrate how the labels are used to control the placement of the policies. In this case the policy is enforced on the clusters labeled with `kubeadmin-enforce=true`
 
 **Test Procedure**
 
 1. Go to ACM -> Governance, select the `CIS OpenShift Container Platform 4 Benchmark` standart and select the policy `compliance-cis-results`. Under this Policy you will find the template `cis-results`, that shows the violations for each cluster.
   - Select `cis-results`
-  - on the Cluster, template `cis-results`, press on the `View Details` textfield, this will show the Violations raised by `cis-ocp4`.
+  - Select the template `cis-results` of the cluster named `cluster1`, press on the `View Details` textfield, this will show the Violations raised by `cis-ocp4`.
   - one of such violations is `ocp4-cis-kubeadmin-removed`, press on top of this violation and a new window will open with the recommendation to fix it.
   - Confirm the secret exists on a target cluster before enforcing, for example in cluster1:
     ```bash
@@ -315,6 +313,8 @@ Commit and push. ArgoCD syncs the ConfigMap to all clusters and the violation di
     oc get policy kubeadmin-remove-enforce -n acm-policies -o jsonpath='{range .status.status[*]}{.clustername}: {.compliant}{"\n"}{end}'
     ```
 
+**NOTE:** The `ocp4-cis-kubeadmin-removed` will keep showing a violation until the Openshift compliance scan runs again.
+
 ---
 
 ### Test 3: Run the Compliance Operator OCP CIS Benchmark again and check that the fixed violations are cleared
@@ -355,13 +355,13 @@ Commit and push. ArgoCD syncs the ConfigMap to all clusters and the violation di
 
 **Objectives:**
 
-- Verify that a ClusterRoleBinding granting access to `system:unauthenticated` is flagged by the `rbac-no-unauth-access` ConfigurationPolicy (inside the `detect-anonymous-and-wildcard-rbac` parent policy).
+- Verify that a `ClusterRoleBinding` granting access to `system:unauthenticated` is flagged by the `rbac-no-unauth-access` policy (inside the `detect-anonymous-and-wildcard-rbac` parent policy).
 - Verify how to whitelist CRB and CR, adding inline in the policy the trusted ones. This whitelist contains a list of trusted CBR and CR - `$allowedCRBs` and `$allowedRoles`
 
 **Test Procedure**
 
 1. Open the **ACM Console → Governance** dashboard. Select the `CIS OpenShift Container Platform 4 Benchmark` standart. Locate the policy `detect-anonymous-and-wildcard-rbac` and review the current violations for the `rbac-no-unauth-access` template. Note the existing violations (if any).
-2. Create on the ACM Hub (local-cluster), a test ClusterRoleBinding that grants the `view` ClusterRole to `system:unauthenticated`:
+2. Create on the ACM Hub (local-cluster), a test ClusterRoleBinding that grants the `view` ClusterRole to the group `system:unauthenticated`:
   ```bash
    oc create clusterrolebinding test-unauth-access --clusterrole=view --group=system:unauthenticated
   ```
@@ -380,7 +380,7 @@ Commit and push. ArgoCD syncs the ConfigMap to all clusters and the violation di
 5. Commit and push:
   ```bash
    git add policies/rbac/manifests/cis-rbac-controls.yaml
-   git commit -m "test: add test-unauth-access to trusted CRBs"
+   git commit -m "test - add test-unauth-access to trusted CRBs"
    git push
   ```
 6. Wait for ArgoCD to sync and the next policy evaluation cycle (1–2 minutes). Verify the violation for `test-unauth-access` is cleared in the ACM Governance UI.
