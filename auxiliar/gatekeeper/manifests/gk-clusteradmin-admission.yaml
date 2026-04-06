@@ -1,0 +1,25 @@
+# =============================================================================
+# Admission monitor: checks for Gatekeeper deny Events for the
+# gk-clusteradmin-binding constraint. Non-compliant when a request has
+# been rejected by the Gatekeeper admission webhook (only fires when
+# the policy remediationAction is set to enforce / Gatekeeper deny).
+# =============================================================================
+apiVersion: policy.open-cluster-management.io/v1
+kind: ConfigurationPolicy
+metadata:
+  name: gk-clusteradmin-admission
+spec:
+  remediationAction: inform
+  severity: high
+  object-templates:
+    - complianceType: mustnothave
+      objectDefinition:
+        apiVersion: v1
+        kind: Event
+        metadata:
+          namespace: openshift-gatekeeper-system
+          annotations:
+            constraint_action: deny
+            constraint_kind: K8sClusterAdminBinding
+            constraint_name: gk-clusteradmin-binding
+            event_type: violation

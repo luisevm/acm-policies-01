@@ -1,0 +1,38 @@
+# =============================================================================
+# RBAC Policy Exceptions ConfigMap
+#
+# Enforces a ConfigMap on every managed cluster containing the allowed-entity
+# lists for all RBAC policies. Each key maps to a policy and holds
+# a newline-separated list of resource names to skip during evaluation.
+#
+# To add an exception, edit this file and commit — ArgoCD syncs the change
+# to all clusters. Cluster-local edits are reverted by ACM on the next
+# evaluation cycle.
+#
+# Keys with no entries can be left as empty strings ("").
+# =============================================================================
+apiVersion: policy.open-cluster-management.io/v1
+kind: ConfigurationPolicy
+metadata:
+  name: cm-rbac-exceptions-exists
+spec:
+  remediationAction: enforce
+  severity: low
+  object-templates:
+    - complianceType: musthave
+      objectDefinition:
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: acm-policies
+    - complianceType: musthave
+      objectDefinition:
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: rbac-policy-exceptions
+          namespace: acm-policies
+        data:
+          # CRB names to skip in cis-cluster-admin
+          cis-cluster-admin: |
+            cluster-admin-0

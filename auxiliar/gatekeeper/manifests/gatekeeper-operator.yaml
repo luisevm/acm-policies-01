@@ -1,0 +1,30 @@
+# =============================================================================
+# Gatekeeper Operator — Install via OLM
+#
+# Installs the Red Hat Gatekeeper Operator from the redhat-operators catalog.
+# The operator manages the Gatekeeper admission controller lifecycle on each
+# managed cluster.
+#
+# Source: adapted from the ACM policy-collection stable reference:
+# https://github.com/open-cluster-management-io/policy-collection/blob/main/stable/CM-Configuration-Management/policy-gatekeeper-operator-downstream.yaml
+# =============================================================================
+apiVersion: policy.open-cluster-management.io/v1beta1
+kind: OperatorPolicy
+metadata:
+  name: gatekeeper-operator-install
+spec:
+  remediationAction: enforce
+  severity: high
+  complianceType: musthave
+  upgradeApproval: Automatic
+  subscription:
+    channel: stable
+    name: gatekeeper-operator-product
+    namespace: openshift-operators
+    source: redhat-operators
+    sourceNamespace: openshift-marketplace
+  complianceConfig:
+    catalogSourceUnhealthy: Compliant
+    deploymentsUnavailable: NonCompliant
+    upgradesAvailable: Compliant
+    upgradesProgressing: Compliant

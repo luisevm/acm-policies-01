@@ -1,0 +1,31 @@
+# =============================================================================
+# Constraint: gk-wildcard-clusterrole
+#
+# Applies the K8sWildcardClusterRole template to all ClusterRoleBindings.
+# Flags CRBs whose referenced ClusterRole has wildcard verbs or resources.
+#
+# enforcementAction is set to dryrun; ACM overrides it based on the
+# parent Policy's remediationAction (inform → warn, enforce → deny).
+# =============================================================================
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sWildcardClusterRole
+metadata:
+  name: gk-wildcard-clusterrole
+  annotations:
+    policy.open-cluster-management.io/severity: high
+spec:
+  enforcementAction: dryrun
+  match:
+    kinds:
+      - apiGroups: ["rbac.authorization.k8s.io"]
+        kinds: ["ClusterRoleBinding"]
+      - apiGroups: ["rbac.authorization.k8s.io"]
+        kinds: ["RoleBinding"]
+  parameters:
+    allowedBindings: []
+    excludePrefixes:
+      - "system:"
+      - "open-cluster-management:"
+      - "openshift-"
+      - "hive-"
+      - "multicluster-engine"

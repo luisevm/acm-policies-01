@@ -1,0 +1,65 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: PolicyGenerator
+metadata:
+  name: gatekeeper-policies
+policyDefaults:
+  namespace: acm-policies
+  remediationAction: enforce
+  severity: high
+  consolidateManifests: false
+  categories:
+    - CM Configuration Management
+  standards:
+    - NIST SP 800-53
+  controls:
+    - CM-2
+
+policies:
+  - name: gatekeeper-operator-install
+    manifests:
+      - path: manifests/gatekeeper-operator.yaml
+      - path: manifests/gatekeeper-cr.yaml
+    remediationAction: enforce
+    severity: high
+    placement:
+      labelSelector:
+        matchLabels:
+          vendor: OpenShift
+
+  - name: gk-rbac-clusteradmin
+    manifests:
+      - path: manifests/gk-clusteradmin-template.yaml
+      - path: manifests/gk-clusteradmin-constraint.yaml
+      - path: manifests/gk-clusteradmin-audit.yaml
+      - path: manifests/gk-clusteradmin-admission.yaml
+    remediationAction: inform
+    severity: high
+    categories:
+      - Access Control
+    standards:
+      - CIS
+    controls:
+      - CIS 5.1
+    placement:
+      labelSelector:
+        matchLabels:
+          vendor: OpenShift
+
+  - name: gk-rbac-wildcard-roles
+    manifests:
+      - path: manifests/gk-wildcard-roles-template.yaml
+      - path: manifests/gk-wildcard-roles-constraint.yaml
+      - path: manifests/gk-wildcard-audit.yaml
+      - path: manifests/gk-wildcard-admission.yaml
+    remediationAction: inform
+    severity: high
+    categories:
+      - Access Control
+    standards:
+      - CIS
+    controls:
+      - CIS 5.1
+    placement:
+      labelSelector:
+        matchLabels:
+          vendor: OpenShift

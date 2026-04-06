@@ -1,0 +1,21 @@
+# =============================================================================
+# Audit monitor: checks that the Gatekeeper constraint gk-wildcard-clusterrole
+# reports zero audit violations. Non-compliant when existing cluster resources
+# fail the constraint check (Gatekeeper audit runs every 60s by default).
+# =============================================================================
+apiVersion: policy.open-cluster-management.io/v1
+kind: ConfigurationPolicy
+metadata:
+  name: gk-wildcard-audit
+spec:
+  remediationAction: inform
+  severity: high
+  object-templates:
+    - complianceType: musthave
+      objectDefinition:
+        apiVersion: constraints.gatekeeper.sh/v1beta1
+        kind: K8sWildcardClusterRole
+        metadata:
+          name: gk-wildcard-clusterrole
+        status:
+          totalViolations: 0

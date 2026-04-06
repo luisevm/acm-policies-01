@@ -1,0 +1,26 @@
+# =============================================================================
+# Gatekeeper Custom Resource — configures the Gatekeeper instance
+#
+# Created by the Gatekeeper Operator after installation. Key settings:
+#   - Validating webhook enabled (admission checks)
+#   - Mutating webhook disabled (no resource mutation)
+#   - Audit from cache set to Automatic (auto-syncs resources referenced
+#     by constraints — required for referential policies)
+#   - Admission events emitted for ACM audit result aggregation
+# =============================================================================
+apiVersion: operator.gatekeeper.sh/v1alpha1
+kind: Gatekeeper
+metadata:
+  name: gatekeeper
+spec:
+  audit:
+    auditChunkSize: 500
+    logLevel: INFO
+    replicas: 1
+    auditFromCache: Automatic
+  validatingWebhook: Enabled
+  mutatingWebhook: Disabled
+  webhook:
+    emitAdmissionEvents: Enabled
+    logLevel: INFO
+    replicas: 2

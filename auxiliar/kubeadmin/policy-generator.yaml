@@ -1,0 +1,30 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: PolicyGenerator
+metadata:
+  name: kubeadmin-policies
+policyDefaults:
+  namespace: acm-policies
+  remediationAction: inform
+  severity: critical
+  consolidateManifests: false
+  categories:
+    - Access Control
+  standards:
+    - CIS OpenShift Container Platform 4 Benchmark
+    - NIST SP 800-53
+    - PCI DSS
+  controls:
+    - AC-2 Account Management
+    - AC-6 Least Privilege
+    - AC-3 Access Enforcement
+
+policies:
+  - name: kubeadmin-remove-enforce
+    manifests:
+      - path: manifests/kubeadmin-secret-enforce.yaml
+    remediationAction: enforce
+    severity: critical
+    placement:
+      labelSelector:
+        matchLabels:
+          kubeadmin-enforce: "true"

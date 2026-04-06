@@ -1,0 +1,31 @@
+# =============================================================================
+# Constraint: gk-clusteradmin-binding
+#
+# Applies the K8sClusterAdminBinding template to all ClusterRoleBindings.
+# Flags CRBs that directly reference the cluster-admin ClusterRole.
+#
+# enforcementAction is set to dryrun; ACM overrides it based on the
+# parent Policy's remediationAction (inform → warn, enforce → deny).
+# =============================================================================
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sClusterAdminBinding
+metadata:
+  name: gk-clusteradmin-binding
+  annotations:
+    policy.open-cluster-management.io/severity: high
+spec:
+  enforcementAction: dryrun
+  match:
+    kinds:
+      - apiGroups: ["rbac.authorization.k8s.io"]
+        kinds: ["ClusterRoleBinding"]
+      - apiGroups: ["rbac.authorization.k8s.io"]
+        kinds: ["RoleBinding"]
+  parameters:
+    allowedBindings: []
+    excludePrefixes:
+      - "system:"
+      - "open-cluster-management:"
+      - "openshift-"
+      - "hive-"
+      - "multicluster-engine"

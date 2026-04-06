@@ -1,0 +1,79 @@
+# =============================================================================
+# CIS 5.1.1 — Ensure that the cluster-admin role is only used where required
+#
+# Finds ClusterRoleBindings to cluster-admin where ANY subject is:
+#   - A ServiceAccount in a non-platform namespace
+#   - A User or Group not starting with "system:"
+#
+# Platform namespaces (excluded from findings):
+#   openshift-*, kube-*, hive, multicluster-engine,
+#   open-cluster-management, open-cluster-management-*
+#
+# EXCEPTIONS: To approve a ClusterRoleBinding that triggers this policy,
+# add its name to the "cis-cluster-admin" key in the
+# rbac-policy-exceptions ConfigMap (manifests/cm-rbac-exceptions.yaml).
+# Find the CRB name in the ACM console violation details or with:
+#   oc get clusterrolebindings -o json | jq -r '.items[] |
+#     select(.roleRef.name=="cluster-admin") | .metadata.name'
+#
+# Non-compliant if any non-allowed, non-platform CRB exists.
+
+# Wildcard with the allowed list of ClusterRoleBindings - that are allowed to not comply with the Policy 
+# in configmap: cm-rbac-exceptions-exists
+# =============================================================================
+apiVersion: policy.open-cluster-management.io/v1
+kind: ConfigurationPolicy
+metadata:
+  name: cis-cluster-admin
+spec:
+  remediationAction: inform
+  severity: critical
+  object-templates-raw: |
+    {{- /* Load exceptions from ConfigMap (enforced by cm-rbac-exceptions-exists policy) */ -}}
+    {{- $cm := (lookup "v1" "ConfigMap" "acm-policies" "rbac-policy-exceptions") }}
+    {{- $allowed := list }}
+    {{- if $cm.data }}
+      {{- range (splitList "\n" (default "" (index $cm.data "cis-cluster-admin"))) }}
+        {{- if ne (trim .) "" }}
+          {{- $allowed = append $allowed (trim .) }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+    {{- range $crb := (lookup "rbac.authorization.k8s.io/v1" "ClusterRoleBinding" "" "").items }}
+      {{- if and (eq $crb.roleRef.name "cluster-admin") (not (has $crb.metadata.name $allowed)) }}
+        {{- $found := false }}
+        {{- range $subj := (default (list) $crb.subjects) }}
+
+          {{- /* Check ServiceAccounts in non-platform namespaces */ -}}
+          {{- if and (not $found) (eq $subj.kind "ServiceAccount") }}
+            {{- $ns := (default "" $subj.namespace) }}
+            {{- if not (or
+              (hasPrefix "openshift-" $ns)
+              (hasPrefix "kube-" $ns)
+              (eq $ns "hive")
+              (eq $ns "multicluster-engine")
+              (eq $ns "open-cluster-management")
+              (hasPrefix "open-cluster-management-" $ns)
+            ) }}
+              {{- $found = true }}
+            {{- end }}
+          {{- end }}
+
+          {{- /* Check non-system Users and Groups */ -}}
+          {{- if and (not $found) (or (eq $subj.kind "User") (eq $subj.kind "Group")) }}
+            {{- if not (hasPrefix "system:" $subj.name) }}
+              {{- $found = true }}
+            {{- end }}
+          {{- end }}
+
+        {{- end }}
+        {{- if $found }}
+    - complianceType: mustnothave
+      objectDefinition:
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: {{ $crb.metadata.name }}
+        {{- end }}
+      {{- end }}
+    {{- end }}

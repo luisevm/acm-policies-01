@@ -1,0 +1,105 @@
+# =============================================================================
+# ConstraintTemplate: K8sWildcardClusterRole
+#
+# Flags ClusterRoleBindings and RoleBindings whose referenced
+# ClusterRole or Role contains a rule with wildcard verbs ("*"),
+# wildcard resources ("*"), or wildcard apiGroups ("*").
+#
+# This is a referential policy — it uses data.inventory to look up the
+# ClusterRole or Role referenced by the binding. Gatekeeper must cache
+# these resources; set auditFromCache: Automatic in the Gatekeeper CR.
+#
+# Parameters:
+#   allowedBindings  — binding names to skip (known-good bindings)
+#   excludePrefixes  — name prefixes to skip (e.g. "system:")
+# =============================================================================
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8swildcardclusterrole
+  annotations:
+    policy.open-cluster-management.io/severity: high
+    metadata.gatekeeper.sh/title: "Flag bindings referencing roles with wildcard verbs, resources, or apiGroups"
+    metadata.gatekeeper.sh/version: 1.0.0
+    metadata.gatekeeper.sh/requires-sync-data: |
+      "[
+        [
+          {
+            \"groups\": [\"rbac.authorization.k8s.io\"],
+            \"versions\": [\"v1\"],
+            \"kinds\": [\"ClusterRole\"]
+          },
+          {
+            \"groups\": [\"rbac.authorization.k8s.io\"],
+            \"versions\": [\"v1\"],
+            \"kinds\": [\"Role\"]
+          }
+        ]
+      ]"
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sWildcardClusterRole
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            allowedBindings:
+              type: array
+              items:
+                type: string
+              description: Binding names to exclude from evaluation
+            excludePrefixes:
+              type: array
+              items:
+                type: string
+              description: Name prefixes to exclude (e.g. "system:")
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8swildcardclusterrole
+
+        # ClusterRoleBinding or RoleBinding referencing a ClusterRole
+        violation[{"msg": msg}] {
+          input.review.object.roleRef.kind == "ClusterRole"
+          roleName := input.review.object.roleRef.name
+          name := input.review.object.metadata.name
+          not is_excluded(name)
+          clusterRole := data.inventory.cluster["rbac.authorization.k8s.io/v1"]["ClusterRole"][roleName]
+          has_wildcard_rule(clusterRole)
+          msg := sprintf("%v '%v' references ClusterRole '%v' which has wildcard verbs, resources, or apiGroups", [input.review.object.kind, name, roleName])
+        }
+
+        # RoleBinding referencing a namespace-scoped Role
+        violation[{"msg": msg}] {
+          input.review.object.roleRef.kind == "Role"
+          roleName := input.review.object.roleRef.name
+          name := input.review.object.metadata.name
+          ns := input.review.object.metadata.namespace
+          not is_excluded(name)
+          role := data.inventory.namespace[ns]["rbac.authorization.k8s.io/v1"]["Role"][roleName]
+          has_wildcard_rule(role)
+          msg := sprintf("RoleBinding '%v' in namespace '%v' references Role '%v' which has wildcard verbs, resources, or apiGroups", [name, ns, roleName])
+        }
+
+        is_excluded(name) {
+          name == input.parameters.allowedBindings[_]
+        }
+
+        is_excluded(name) {
+          prefix := input.parameters.excludePrefixes[_]
+          startswith(name, prefix)
+        }
+
+        has_wildcard_rule(role) {
+          role.rules[_].verbs[_] == "*"
+        }
+
+        has_wildcard_rule(role) {
+          role.rules[_].resources[_] == "*"
+        }
+
+        has_wildcard_rule(role) {
+          role.rules[_].apiGroups[_] == "*"
+        }

@@ -1,0 +1,63 @@
+# =============================================================================
+# CIS-OCP 5.5.1 — Enforce image provenance policy
+#
+# Enforce variant of the allowed-registries audit policy.
+# Targets only clusters labelled with: registry-enforce=true
+#
+# When enforced, ACM patches image.config.openshift.io/cluster on the
+# target cluster to include the registries listed below. The Machine
+# Config Operator then rolls the change out to all nodes (rolling reboot).
+#
+# To enable enforcement on a cluster:
+#   oc label managedcluster <name> registry-enforce=true --overwrite
+# To disable:
+#   oc label managedcluster <name> registry-enforce-
+
+#https://docs.redhat.com/en/documentation/openshift_container_platform/4.10/html/images/image-configuration
+# =============================================================================
+
+# ocp4-cis-ocp-allowed-registries
+apiVersion: policy.open-cluster-management.io/v1
+kind: ConfigurationPolicy
+metadata:
+  name: allowed-registries
+spec:
+  remediationAction: enforce
+  severity: high
+  object-templates:
+    - complianceType: musthave
+      objectDefinition:
+        apiVersion: config.openshift.io/v1
+        kind: Image
+        metadata:
+          name: cluster
+        spec:
+          registrySources:
+            allowedRegistries:
+              - registry.redhat.io
+              - quay.io
+              - registry.access.redhat.com
+              - image-registry.openshift-image-registry.svc:5000
+              - docker.io
+---
+# ocp4-cis-ocp-allowed-registries-for-import
+apiVersion: policy.open-cluster-management.io/v1
+kind: ConfigurationPolicy
+metadata:
+  name: allowed-registries-for-import
+spec:
+  remediationAction: enforce
+  severity: high
+  object-templates:
+    - complianceType: musthave
+      objectDefinition:
+        apiVersion: config.openshift.io/v1
+        kind: Image
+        metadata:
+          name: cluster
+        spec:
+          allowedRegistriesForImport:
+            - domainName: registry.redhat.io
+              insecure: false
+            - domainName: quay.io
+              insecure: false

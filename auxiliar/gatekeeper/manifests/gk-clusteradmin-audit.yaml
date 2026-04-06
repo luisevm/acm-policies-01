@@ -1,0 +1,21 @@
+# =============================================================================
+# Audit monitor: checks that the Gatekeeper constraint gk-clusteradmin-binding
+# reports zero audit violations. Non-compliant when existing cluster resources
+# fail the constraint check (Gatekeeper audit runs every 60s by default).
+# =============================================================================
+apiVersion: policy.open-cluster-management.io/v1
+kind: ConfigurationPolicy
+metadata:
+  name: gk-clusteradmin-audit
+spec:
+  remediationAction: inform
+  severity: high
+  object-templates:
+    - complianceType: musthave
+      objectDefinition:
+        apiVersion: constraints.gatekeeper.sh/v1beta1
+        kind: K8sClusterAdminBinding
+        metadata:
+          name: gk-clusteradmin-binding
+        status:
+          totalViolations: 0
