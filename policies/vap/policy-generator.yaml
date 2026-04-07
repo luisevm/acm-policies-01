@@ -1,0 +1,34 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: PolicyGenerator
+metadata:
+  name: vap-policies
+policyDefaults:
+  namespace: acm-policies
+  remediationAction: enforce
+  severity: critical
+  consolidateManifests: false
+  standards:
+    - CIS OpenShift Container Platform 4 Benchmark
+  categories:
+    - Access Control
+  controls:
+    - AC-6 Least Privilege
+    - AC-3 Access Enforcement
+  policySets:
+    - vap
+  generatePlacementWhenInSet: false
+
+policies:
+  - name: cluster-admin-allow-list
+    description: >-
+      Deploys a ValidatingAdmissionPolicy (VAP) that restricts who can be
+      bound to the cluster-admin ClusterRole. Only pre-approved users, groups,
+      and service accounts are allowed. Unapproved bindings are denied at
+      admission time.
+    manifests:
+      - path: manifests/cluster-admin-allow-list.yaml
+
+policySets:
+  - name: vap
+    description: "Validating Admission Policies — prevent unsafe cluster-admin bindings at admission time"
+    generatePolicySetPlacement: false

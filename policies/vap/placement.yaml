@@ -1,0 +1,26 @@
+---
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: placement-vap
+  namespace: acm-policies
+spec:
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchLabels:
+            vendor: OpenShift
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: binding-vap
+  namespace: acm-policies
+placementRef:
+  name: placement-vap
+  kind: Placement
+  apiGroup: cluster.open-cluster-management.io
+subjects:
+  - name: vap
+    kind: PolicySet
+    apiGroup: policy.open-cluster-management.io

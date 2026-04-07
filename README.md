@@ -42,6 +42,7 @@ All policies carry three ACM metadata fields used for filtering and grouping in 
 | Compliance | `compliance-operator`                | enforce     | medium   | All OpenShift clusters   | `operators/compliance-operator/` | Installs the Compliance Operator (namespace, OperatorPolicy, OperatorGroup)                                           |
 | Compliance | `compliance-cis-scan`                | enforce     | high     | All OpenShift clusters   | `operators/compliance-operator/` | Deploys CIS ScanSetting + ScanSettingBinding                                                                          |
 | Compliance | `compliance-cis-results`             | inform      | high     | All OpenShift clusters   | `operators/compliance-operator/` | Reports failed CIS ComplianceCheckResults — non-compliant when checks fail                                            |
+| VAP        | `cluster-admin-allow-list`           | enforce     | critical | All OpenShift clusters   | `policies/vap/`                  | Deploys a ValidatingAdmissionPolicy that denies ClusterRoleBindings to `cluster-admin` with subjects not on the allow-list |
 
 
 ---
@@ -429,6 +430,64 @@ Go to ACM -> Governance, select the `CIS OpenShift Container Platform 4 Benchmar
    oc delete project test-wildcard-role
   ```
    Then remove `"test-wildcard-role/test-wildcard"` from `$allowedRoles` in `cis-rbac-controls.yaml`, commit and push.
+
+### Test 7: ValidatingAdmissionPolicy — Deny Unauthorized cluster-admin Bindings
+
+**Objectives:**
+
+- Demonstrate the use of Kubernetes-native [ValidatingAdmissionPolicy](https://kubernetes.io/docs/reference/access-authn-authz/validating-admission-policy/) (VAP) deployed through ACM PolicyGenerator and ArgoCD.
+- Verify that the VAP denies `ClusterRoleBinding` creation for subjects not on the approved allow-list at admission time (not just audit).
+
+> **Prerequisite:** ValidatingAdmissionPolicy (`admissionregistration.k8s.io/v1`) requires **Kubernetes 1.30+ / OpenShift 4.17+**. Confirm your managed clusters meet this requirement before proceeding.
+
+**Test Procedure**
+
+1. The policy files are already present under `policies/vap/`. Push the changes so ArgoCD picks up the new folder:
+  ```bash
+   git add policies/vap/
+   git commit -m "add VAP cluster-admin allow-list policy"
+   git push
+  ```
+2. Wait for ArgoCD to sync. Verify a new Application was created by the ApplicationSet:
+  ```bash
+   oc get app.argoproj.io acm-policies-vap -n openshift-gitops
+  ```
+3. Verify the ACM policy is created and distributed:
+  ```bash
+   oc get policy cluster-admin-allow-list -n acm-policies
+   oc get policy cluster-admin-allow-list -n acm-policies \
+     -o jsonpath='{range .status.status[*]}{.clustername}: {.compliant}{"\n"}{end}'
+  ```
+4. Confirm the ValidatingAdmissionPolicy and its binding exist on a managed cluster:
+  ```bash
+   oc --kubeconfig=/tmp/cluster1-kubeconfig get validatingadmissionpolicy cluster-admin-allow-list
+   oc --kubeconfig=/tmp/cluster1-kubeconfig get validatingadmissionpolicybinding cluster-admin-allow-list-binding
+  ```
+5. **Test: create a ClusterRoleBinding with an unauthorized user.** This should be **denied** at admission time by the VAP:
+  ```bash
+   oc --kubeconfig=/tmp/cluster1-kubeconfig create clusterrolebinding test-vap-deny \
+     --clusterrole=cluster-admin --user=unauthorized-user@example.com
+  ```
+   Expected output:
+  ```
+   Error from server (Forbidden): admission webhook denied the request:
+   ClusterRoleBinding to cluster-admin contains subjects not on the allow-list.
+   Only approved users, groups, and service accounts can be bound to cluster-admin.
+  ```
+6. **Test: create a ClusterRoleBinding with an allowed user.** This should be **accepted**:
+  ```bash
+   oc --kubeconfig=/tmp/cluster1-kubeconfig create clusterrolebinding test-vap-allow \
+     --clusterrole=cluster-admin --user=system:admin
+  ```
+   Expected output: `clusterrolebinding.rbac.authorization.k8s.io/test-vap-allow created`
+7. **Clean up** — remove the test CRB:
+  ```bash
+   oc --kubeconfig=/tmp/cluster1-kubeconfig delete clusterrolebinding test-vap-allow
+  ```
+
+> **Key difference from ConfigurationPolicy-based RBAC checks:** The `cis-cluster-admin` policy (Test 5) uses a ConfigurationPolicy that *detects* existing non-compliant ClusterRoleBindings after they are created. The ValidatingAdmissionPolicy in this test *prevents* non-compliant ClusterRoleBindings from being created in the first place. Both approaches are complementary — VAP blocks new violations at admission time, while ConfigurationPolicy catches pre-existing ones.
+
+---
 
 ### Test 3: Gatekeeper RBAC Constraint — Admission and Audit
 
