@@ -1,0 +1,56 @@
+# =============================================================================
+# VAP Cluster-Admin Allow-List Parameters
+#
+# ConfigMap used as the parameter resource for the ValidatingAdmissionPolicy
+# cluster-admin-allow-list-cm. The VAP reads these values at admission time
+# via params.data.<key> in CEL expressions.
+#
+# Each key holds a newline-separated list of allowed entities per subject kind.
+# To add or remove entries, edit this file and commit — ArgoCD syncs the
+# change to all clusters. The VAP picks up the new values immediately.
+#
+# NOTE: Use the YAML block scalar |- (strip trailing newline) to avoid
+# producing empty entries when the CEL expression splits on newline.
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vap-cluster-admin-params
+  namespace: acm-policies
+data:
+  allowedUsers: |-
+    kubeadmin
+    system:admin
+    alice@my-company.com
+    admin
+  allowedGroups: |-
+    system:masters
+    ocp-sre-team
+    system:cluster-admins
+  allowedServiceAccounts: |-
+    openshift-monitoring/prometheus-k8s
+    openshift-network-operator/cluster-network-operator
+    openshift-cluster-storage-operator/cluster-storage-operator
+    openshift-cluster-version/default
+    openshift-machine-config-operator/machine-config-operator
+    openshift-kube-storage-version-migrator/kube-storage-version-migrator-sa
+    openshift-oauth-apiserver/oauth-apiserver-sa
+    openshift-apiserver/openshift-apiserver-sa
+    openshift-authentication/oauth-openshift
+    openshift-authentication-operator/authentication-operator
+    openshift-kube-scheduler-operator/openshift-kube-scheduler-operator
+    openshift-etcd-operator/etcd-operator
+    openshift-kube-apiserver-operator/kube-apiserver-operator
+    openshift-kube-apiserver/localhost-recovery-client
+    openshift-kube-controller-manager-operator/kube-controller-manager-operator
+    openshift-kube-controller-manager/localhost-recovery-client
+    openshift-kube-scheduler/localhost-recovery-client
+    openshift-kube-storage-version-migrator-operator/kube-storage-version-migrator-operator
+    openshift-apiserver-operator/openshift-apiserver-operator
+    openshift-config-operator/openshift-config-operator
+    openshift-controller-manager-operator/openshift-controller-manager-operator
+    openshift-etcd/installer-sa
+    openshift-kube-apiserver/installer-sa
+    openshift-kube-controller-manager/installer-sa
+    openshift-kube-scheduler/installer-sa
+    openshift-service-ca-operator/service-ca-operator

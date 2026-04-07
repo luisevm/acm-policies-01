@@ -1,0 +1,45 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: PolicyGenerator
+metadata:
+  name: vap-cm-policies
+policyDefaults:
+  namespace: acm-policies
+  remediationAction: enforce
+  severity: critical
+  consolidateManifests: false
+  standards:
+    - CIS OpenShift Container Platform 4 Benchmark
+  categories:
+    - Access Control
+  controls:
+    - AC-6 Least Privilege
+    - AC-3 Access Enforcement
+  policySets:
+    - vap-cm
+  generatePlacementWhenInSet: false
+
+policies:
+  - name: vap-cluster-admin-params-exists
+    description: >-
+      Deploys the vap-cluster-admin-params ConfigMap to all managed clusters.
+      This ConfigMap is the parameter resource for the cluster-admin-allow-list-cm
+      ValidatingAdmissionPolicy. Entries can be edited in Git to update the
+      allow-list without redeploying the VAP.
+    manifests:
+      - path: manifests/cm-vap-cluster-admin-params.yaml
+    remediationAction: enforce
+    severity: low
+
+  - name: cluster-admin-allow-list-cm
+    description: >-
+      Deploys a parameterized ValidatingAdmissionPolicy that restricts who can
+      be bound to the cluster-admin ClusterRole. The allow-list is read from the
+      vap-cluster-admin-params ConfigMap at admission time. Unapproved bindings
+      are denied.
+    manifests:
+      - path: manifests/cluster-admin-allow-list.yaml
+
+policySets:
+  - name: vap-cm
+    description: "Parameterized VAP — cluster-admin allow-list driven by ConfigMap"
+    generatePolicySetPlacement: false

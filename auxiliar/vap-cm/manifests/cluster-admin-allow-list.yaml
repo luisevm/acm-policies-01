@@ -1,0 +1,53 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: cluster-admin-allow-list-cm
+spec:
+  failurePolicy: Fail
+  paramKind:
+    apiVersion: v1
+    kind: ConfigMap
+  matchConstraints:
+    resourceRules:
+    - apiGroups: ["rbac.authorization.k8s.io"]
+      apiVersions: ["v1"]
+      operations: ["CREATE", "UPDATE"]
+      resources: ["clusterrolebindings"]
+  validations:
+  - expression: |
+      object.roleRef.name != 'cluster-admin' ||
+      object.subjects.all(subject,
+        (subject.kind == 'User' &&
+          has(params.data.allowedUsers) &&
+          params.data.allowedUsers.split('\n').exists(u, u == subject.name)
+        ) ||
+        (subject.kind == 'Group' &&
+          has(params.data.allowedGroups) &&
+          params.data.allowedGroups.split('\n').exists(g, g == subject.name)
+        ) ||
+        (subject.kind == 'ServiceAccount' &&
+          has(subject.namespace) &&
+          has(params.data.allowedServiceAccounts) &&
+          params.data.allowedServiceAccounts.split('\n').exists(sa,
+            sa == (subject.namespace + '/' + subject.name)
+          )
+        )
+      )
+    message: >-
+      ClusterRoleBinding to cluster-admin contains subjects not on the
+      allow-list. Edit the vap-cluster-admin-params ConfigMap in the
+      acm-policies namespace to add approved users, groups, or service accounts.
+    reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: cluster-admin-allow-list-cm-binding
+spec:
+  policyName: cluster-admin-allow-list-cm
+  paramRef:
+    name: vap-cluster-admin-params
+    namespace: acm-policies
+    parameterNotFoundAction: Deny
+  validationActions: ["Deny"]

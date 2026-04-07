@@ -43,6 +43,8 @@ All policies carry three ACM metadata fields used for filtering and grouping in 
 | Compliance | `compliance-cis-scan`                | enforce     | high     | All OpenShift clusters   | `operators/compliance-operator/` | Deploys CIS ScanSetting + ScanSettingBinding                                                                          |
 | Compliance | `compliance-cis-results`             | inform      | high     | All OpenShift clusters   | `operators/compliance-operator/` | Reports failed CIS ComplianceCheckResults — non-compliant when checks fail                                            |
 | VAP        | `cluster-admin-allow-list`           | enforce     | critical | All OpenShift clusters   | `policies/vap/`                  | Deploys a ValidatingAdmissionPolicy that denies ClusterRoleBindings to `cluster-admin` with subjects not on the allow-list |
+| VAP-CM     | `vap-cluster-admin-params-exists`    | enforce     | low      | All OpenShift clusters   | `policies/vap-cm/`               | Deploys the `vap-cluster-admin-params` ConfigMap used as parameter resource by the parameterized VAP                       |
+| VAP-CM     | `cluster-admin-allow-list-cm`        | enforce     | critical | All OpenShift clusters   | `policies/vap-cm/`               | Parameterized VAP — reads the cluster-admin allow-list from ConfigMap instead of hardcoded CEL                             |
 
 
 ---
@@ -442,28 +444,22 @@ Go to ACM -> Governance, select the `CIS OpenShift Container Platform 4 Benchmar
 
 **Test Procedure**
 
-1. The policy files are already present under `policies/vap/`. Push the changes so ArgoCD picks up the new folder:
-  ```bash
-   git add policies/vap/
-   git commit -m "add VAP cluster-admin allow-list policy"
-   git push
-  ```
-2. Wait for ArgoCD to sync. Verify a new Application was created by the ApplicationSet:
+1. Check the policy is created in the cluster
   ```bash
    oc get app.argoproj.io acm-policies-vap -n openshift-gitops
   ```
-3. Verify the ACM policy is created and distributed:
+2. Verify the ACM policy is created and distributed:
   ```bash
    oc get policy cluster-admin-allow-list -n acm-policies
    oc get policy cluster-admin-allow-list -n acm-policies \
      -o jsonpath='{range .status.status[*]}{.clustername}: {.compliant}{"\n"}{end}'
   ```
-4. Confirm the ValidatingAdmissionPolicy and its binding exist on a managed cluster:
+3. Confirm the ValidatingAdmissionPolicy and its binding exist on a managed cluster:
   ```bash
    oc --kubeconfig=/tmp/cluster1-kubeconfig get validatingadmissionpolicy cluster-admin-allow-list
    oc --kubeconfig=/tmp/cluster1-kubeconfig get validatingadmissionpolicybinding cluster-admin-allow-list-binding
   ```
-5. **Test: bind an unauthorized user to `cluster-admin`.** This should be **denied** — the user `toni` is not on the allow-list:
+4. **Test: bind an unauthorized user to `cluster-admin`.** This should be **denied** — the user `toni` is not on the allow-list:
   ```bash
    oc --kubeconfig=/tmp/cluster1-kubeconfig create clusterrolebinding test-vap-deny \
      --clusterrole=cluster-admin --user=toni
@@ -472,19 +468,19 @@ Go to ACM -> Governance, select the `CIS OpenShift Container Platform 4 Benchmar
   ```
   error: failed to create clusterrolebinding: clusterrolebindings.rbac.authorization.k8s.io "test-vap-deny" is forbidden: ValidatingAdmissionPolicy 'cluster-admin-allow-list' with binding 'cluster-admin-allow-list-binding' denied request: ClusterRoleBinding to cluster-admin contains subjects not on the allow-list. Only approved users, groups, and service accounts can be bound to cluster-admin.
   ```
-6. **Test: bind the same unauthorized user to a non-`cluster-admin` role.** This should be **accepted** — the VAP only restricts bindings to `cluster-admin`, other ClusterRoles (e.g. `view`, `edit`) are not affected:
+5. **Test: bind the same unauthorized user to a non-`cluster-admin` role.** This should be **accepted** — the VAP only restricts bindings to `cluster-admin`, other ClusterRoles (e.g. `view`, `edit`) are not affected:
   ```bash
    oc --kubeconfig=/tmp/cluster1-kubeconfig create clusterrolebinding test-vap-view \
      --clusterrole=view --user=toni
   ```
    Expected output: `clusterrolebinding.rbac.authorization.k8s.io/test-vap-view created`
-7. **Test: bind an allowed user to `cluster-admin`.** This should be **accepted** — `system:admin` is on the allow-list:
+6. **Test: bind an allowed user to `cluster-admin`.** This should be **accepted** — `system:admin` is on the allow-list:
   ```bash
    oc --kubeconfig=/tmp/cluster1-kubeconfig create clusterrolebinding test-vap-allow \
      --clusterrole=cluster-admin --user=system:admin
   ```
    Expected output: `clusterrolebinding.rbac.authorization.k8s.io/test-vap-allow created`
-8. **Clean up** — remove the test CRBs:
+7. **Clean up** — remove the test CRBs:
   ```bash
    oc --kubeconfig=/tmp/cluster1-kubeconfig delete clusterrolebinding test-vap-view test-vap-allow
   ```
@@ -501,6 +497,78 @@ A ValidatingAdmissionPolicy is an **admission controller** — it only validates
 Both approaches are **complementary**:
 - **`cluster-admin-allow-list` (VAP)** — **prevents** anyone from creating a *new* unauthorized CRB to `cluster-admin` going forward.
 - **`cis-cluster-admin` (ConfigurationPolicy, Test 5)** — **detects** pre-existing non-compliant CRBs by scanning all ClusterRoleBindings on every evaluation cycle.
+
+---
+
+### Test 8: Parameterized VAP — ConfigMap-Driven Allow-List
+
+**Objectives:**
+
+- Deploy a parameterized version of the cluster-admin ValidatingAdmissionPolicy where the allow-list is stored in a ConfigMap instead of being hardcoded in the CEL expression.
+- Demonstrate that the allow-list can be updated by editing the ConfigMap in Git without redeploying the VAP definition.
+
+> **Prerequisite:** ValidatingAdmissionPolicy (`admissionregistration.k8s.io/v1`) requires **Kubernetes 1.30+ / OpenShift 4.17+**. Confirm your managed clusters meet this requirement before proceeding.
+
+> **Note:** If you deployed the hardcoded VAP from Test 7 (`policies/vap/`), both policies can coexist since they have different resource names (`cluster-admin-allow-list` vs `cluster-admin-allow-list-cm`). However, a ClusterRoleBinding must pass **both** VAPs to be admitted. Remove `policies/vap/` first if you want only the ConfigMap-driven version active.
+
+**Test Procedure**
+
+1. The policy files are under `policies/vap-cm/`. Push the changes so ArgoCD picks up the new folder:
+  ```bash
+   git add policies/vap-cm/
+   git commit -m "add parameterized VAP with ConfigMap-driven allow-list"
+   git push
+  ```
+2. Wait for ArgoCD to sync. Verify the new Application and ACM policies:
+  ```bash
+   oc get app.argoproj.io acm-policies-vap-cm -n openshift-gitops
+   oc get policy -n acm-policies | grep -E 'vap-cluster-admin-params|cluster-admin-allow-list-cm'
+  ```
+3. Confirm the ConfigMap, VAP, and binding exist on a managed cluster:
+  ```bash
+   oc --kubeconfig=/tmp/cluster1-kubeconfig get configmap vap-cluster-admin-params -n acm-policies
+   oc --kubeconfig=/tmp/cluster1-kubeconfig get validatingadmissionpolicy cluster-admin-allow-list-cm
+   oc --kubeconfig=/tmp/cluster1-kubeconfig get validatingadmissionpolicybinding cluster-admin-allow-list-cm-binding
+  ```
+   The VAP should now show `PARAMKIND` as `ConfigMap` (unlike the hardcoded version which shows `<unset>`).
+4. **Test: bind an unauthorized user to `cluster-admin`.** This should be **denied**:
+  ```bash
+   oc --kubeconfig=/tmp/cluster1-kubeconfig create clusterrolebinding test-vap-cm-deny \
+     --clusterrole=cluster-admin --user=toni
+  ```
+   Expected: denied with message referencing the `vap-cluster-admin-params` ConfigMap.
+5. **Test: update the allow-list via ConfigMap.** Add user `toni` to the allow-list by editing the ConfigMap manifest in Git:
+  ```bash
+   vi policies/vap-cm/manifests/cm-vap-cluster-admin-params.yaml
+  ```
+   Add `toni` under `allowedUsers`:
+  ```yaml
+   allowedUsers: |-
+     kubeadmin
+     system:admin
+     alice@my-company.com
+     admin
+     toni
+  ```
+   Commit and push:
+  ```bash
+   git add policies/vap-cm/manifests/cm-vap-cluster-admin-params.yaml
+   git commit -m "test: add toni to VAP allow-list"
+   git push
+  ```
+6. Wait for ArgoCD to sync and ACM to propagate the ConfigMap update. Then retry the same binding:
+  ```bash
+   oc --kubeconfig=/tmp/cluster1-kubeconfig create clusterrolebinding test-vap-cm-deny \
+     --clusterrole=cluster-admin --user=toni
+  ```
+   Expected: `clusterrolebinding.rbac.authorization.k8s.io/test-vap-cm-deny created` — the request is now accepted because `toni` is on the allow-list.
+7. **Clean up** — remove the test CRB and revert the ConfigMap:
+  ```bash
+   oc --kubeconfig=/tmp/cluster1-kubeconfig delete clusterrolebinding test-vap-cm-deny
+  ```
+   Then remove `toni` from `allowedUsers` in `cm-vap-cluster-admin-params.yaml`, commit and push.
+
+**Key advantage over Test 7 (hardcoded VAP):** The allow-list lives in a ConfigMap (`vap-cluster-admin-params`) that ACM enforces on all managed clusters. Adding or removing trusted entities only requires editing the ConfigMap manifest in Git — the VAP definition itself never changes. This follows the same exception-management pattern used by `cis-cluster-admin` (Test 5) with its `rbac-policy-exceptions` ConfigMap.
 
 ---
 
