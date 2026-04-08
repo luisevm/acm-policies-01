@@ -58,18 +58,6 @@ policies:
 
       - path: manifests/scan/cis-results.yml
 
-#  - name: compliance-nerc-cip-scan
-#    description: "Configures the NERC CIP profile scan"
-#    remediationAction: inform
-#    manifests:
-#      - path: manifests/scan/scansetting-nerc.yml
-#        name: compliance-scansetting-nerc
-#        complianceType: musthave
-#
-#      - path: manifests/scan/scansettingbinding-nerc.yml
-#        name: compliance-scansettingbinding-nerc
-#        complianceType: musthave
-
 policySets:
   - name: all-clusters-operators
     description: "Operator policies for all managed clusters (enforce + inform)"

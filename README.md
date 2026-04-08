@@ -8,6 +8,9 @@ It includes multiple tests that exemplify the use of native Red Hat ACM Policies
 
 Policies are deployed using the PolicyGenerator plugin, both standalone and with ArgoCD providing GitOps-driven delivery.
 
+???????????**DISCKAMER:** ....... proper fitting and testing.
+
+
 ### GitHub Repository Organization
 
 The Git repository used for this demo has the following structure:
@@ -16,7 +19,7 @@ The Git repository used for this demo has the following structure:
 - **hub:** Hub cluster configuration only.
 - **operators:** One subfolder per operator to install on managed clusters Each follows the same structure as `policies/` (kustomization + PolicyGenerator + placement + manifests). Operators are Deployed via the `operators-appset.yaml` ApplicationSet.
 - **policies:** One subfolder per audit/compliance policy domain. 
-- **auxiliar:** contains manifests, for example policies, that will be used in the test exercices.
+- **auxiliar:** contains manifests, to be used in the tests chapter and contains the policies, that will be used in the test exercices.
 
 ## Created Policies
 
@@ -199,7 +202,9 @@ Go to ACM -> Governance, select the `CIS OpenShift Container Platform 4 Benchmar
 
 ---
 
-### Test 1: Fix Allowed Registries
+### Demo1: Remediate Violations reported by the Compliance Operator CIS profile scan
+
+#### Step A: Fix Allowed Registries
 
 **Objectives:**
 
@@ -231,9 +236,7 @@ Go to ACM -> Governance, select the `CIS OpenShift Container Platform 4 Benchmar
 
 **NOTE:** The `ocp4-cis-ocp-allowed-registries` will keep showing a violation until the Openshift compliance scan runs again.
 
----
-
-### Test 2: Fix Kubeadmin
+#### Step B: Fix Kubeadmin
 
 > **WARNING — This deletion is permanent.** The kubeadmin secret cannot be restored without reinstalling the cluster. Before labelling a cluster, verify that an identity provider is configured and at least one user can log in with `cluster-admin` privileges: `oc login -u <user>`, or you have a valid `kubeconfig` file.
 
@@ -289,9 +292,7 @@ Go to ACM -> Governance, select the `CIS OpenShift Container Platform 4 Benchmar
 
 **NOTE:** The `ocp4-cis-kubeadmin-removed` will keep showing a violation until the Openshift compliance scan runs again.
 
----
-
-### Test 3: Run the Compliance Operator OCP CIS Benchmark again and check that the fixed violations are cleared
+#### Step C: Run the Compliance Operator OCP CIS Benchmark again and check that the fixed violations are cleared
 
 **Objectives:**
 
@@ -320,7 +321,9 @@ Go to ACM -> Governance, select the `CIS OpenShift Container Platform 4 Benchmar
 
 ---
 
-### Test 4: Fix `rbac-no-unauth-access` unauthenticated CRB Detection
+### Demo 2: CIS Manual Control Visualize and Remidiate Violations
+
+#### Step C: Fix `rbac-no-unauth-access` unauthenticated CRB Detection
 
 **Objectives:**
 
@@ -359,39 +362,7 @@ Go to ACM -> Governance, select the `CIS OpenShift Container Platform 4 Benchmar
   ```
    Then remove `"test-unauth-access"` from `$allowedCRBs` in `cis-rbac-controls.yaml`, commit and push.
 
----
-
-### Test 5: Fix Unauthorized CRB to cluster-admin CR
-
-**Objectives:**
-
-- test that a `ClusterRoleBinding` attaching a ServiceAccount to the cluster-admin `ClusterRole`, will cause ACM to raise a violation in the Governance tab.  
-- Adding the CRB to the list of trusted CRB will clear the violation. A `configmap` contains the list of the whitelisted entities.
-
-**Test Procedure**
-
-- Create a ServiceAccount in a user namespace and bind it to `cluster-admin`:
-  ```bash
-  oc new-project test-cis
-  oc create sa test-sa -n test-cis
-  oc adm policy add-cluster-role-to-user cluster-admin -z test-sa -n test-cis
-  ```
-  The result is that a new ClusterRoleBinding is created, binding the SA to the cluster-admin `ClusterRole`. Policy `cis-cluster-admin` will flag it as **Non-Compliant**.
-- Configure the CRB to be trusted, by adding the CRB to the configmap cm-rbac-exceptions.yaml under "cis-cluster-admin: |" 
-  ```bash
-  vi /mnt/vm/Var/my_git-clone/acm-policies-01/policies/rbac/manifests/cm-rbac-exceptions.yaml
-
-  `<crb-name>`
-  ```
-- Push changes to GitHub
-  ```bash
-  git add /mnt/vm/Var/my_git-clone/acm-policies-01/policies/rbac/manifests/cm-rbac-exceptions.yaml
-  git commit -m "rbac cluster-admin text"
-  git push
-  ```
-- Result is the violation is cleared.
-
-### Test 6: Trigger `rbac-no-wildcard-roles` — Wildcard Role Detection
+### Step B: Trigger `rbac-no-wildcard-roles` — Wildcard Role Detection
 
 **Objectives:**
 
@@ -433,7 +404,40 @@ Go to ACM -> Governance, select the `CIS OpenShift Container Platform 4 Benchmar
   ```
    Then remove `"test-wildcard-role/test-wildcard"` from `$allowedRoles` in `cis-rbac-controls.yaml`, commit and push.
 
-### Test 7: ValidatingAdmissionPolicy — Deny Unauthorized cluster-admin Bindings
+
+#### Step B: Fix Unauthorized CRB to cluster-admin CR
+
+**Objectives:**
+
+- test that a `ClusterRoleBinding` attaching a ServiceAccount to the cluster-admin `ClusterRole`, will cause ACM to raise a violation in the Governance tab.  
+- Adding the CRB to the list of trusted CRB will clear the violation. A `configmap` contains the list of the whitelisted entities.
+
+**Test Procedure**
+
+- Create a ServiceAccount in a user namespace and bind it to `cluster-admin`:
+  ```bash
+  oc new-project test-cis
+  oc create sa test-sa -n test-cis
+  oc adm policy add-cluster-role-to-user cluster-admin -z test-sa -n test-cis
+  ```
+  The result is that a new ClusterRoleBinding is created, binding the SA to the cluster-admin `ClusterRole`. Policy `cis-cluster-admin` will flag it as **Non-Compliant**.
+- Configure the CRB to be trusted, by adding the CRB to the configmap cm-rbac-exceptions.yaml under "cis-cluster-admin: |" 
+  ```bash
+  vi /mnt/vm/Var/my_git-clone/acm-policies-01/policies/rbac/manifests/cm-rbac-exceptions.yaml
+
+  `<crb-name>`
+  ```
+- Push changes to GitHub
+  ```bash
+  git add /mnt/vm/Var/my_git-clone/acm-policies-01/policies/rbac/manifests/cm-rbac-exceptions.yaml
+  git commit -m "rbac cluster-admin text"
+  git push
+  ```
+- Result is the violation is cleared.
+
+---
+
+### Demo 3: Using ValidatingAdmissionPolicy to Deny Unauthorized cluster-admin Bindings
 
 **Objectives:**
 
